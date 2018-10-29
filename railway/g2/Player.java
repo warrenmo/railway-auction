@@ -105,7 +105,7 @@ public class Player implements railway.sim.Player {
                 else {
                     if(b.bidder.equals("g2"))
                     {
-                        break;
+                        return null;
                     }
                     // System.out.println(availableBids.size() + " " + allBids.size());
 
