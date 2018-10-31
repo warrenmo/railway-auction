@@ -162,6 +162,7 @@ public class Simulator {
                     catch (Exception ex) {
                         // This should be an exception only from getBid function.
                         System.out.println("Uh-oh! " + ex.getMessage());
+                        ex.printStackTrace();
                         updates.remove(pw);
                     }
 
