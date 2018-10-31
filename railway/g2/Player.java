@@ -78,31 +78,32 @@ public class Player implements railway.sim.Player {
 
         initializeAvailableLinks(currentBids, allBids);
         //s is the most valuable node
-        int s = 0;
+        int s = getMostValuableNodeNaive();
+        //System.out.println("Most valuable node: " + s + " i.e " + townLookup.get(s));
         // s=getMostValuableNodeNaive();
 
         //get the weightedGraph given node s
         weightedGraph=initializeWeightedGraph(s,townLookup,infra);
-        // weightedGraph.print();
+        weightedGraph.print();
         //implement dijkstra to the weightedGraph
         int[][] prediction = Dijkstra.dijkstra(weightedGraph, s);
-        for (int n=s;n<townLookup.size();n++){
+        for (int n=0;n<townLookup.size();n++){
             System.out.println(weightedGraph.getLabel(s) + " to " + weightedGraph.getLabel(n));
             Dijkstra.printPath(weightedGraph, prediction, n);
-            System.out.println();
+            //System.out.println();
         }
 
-        System.out.println(name + " has budget: " + budget);
+        //System.out.println(name + " has budget: " + budget);
         
         for(int i=0;i<infra.size();i++){
             for(int j=0;j<infra.get(i).size();j++){
-                System.out.println(" infra shows as :"+i+" to "+infra.get(i).get(j));
+                //System.out.println(" infra shows as :"+i+" to "+infra.get(i).get(j));
             }
         }
         
 
         for (BidInfo bi : allBids) {
-            System.out.println("Bid id: " + bi.id + " Bid from " + bi.town1 + " to " + bi.town2 + " made by " + bi.owner + " for: " + bi.amount);
+            //System.out.println("Bid id: " + bi.id + " Bid from " + bi.town1 + " to " + bi.town2 + " made by " + bi.owner + " for: " + bi.amount);
             if (bi.owner == null) {
                 bi.amount += 1111;
                 availableBids.add(bi);
@@ -140,7 +141,7 @@ public class Player implements railway.sim.Player {
                     return null;
                 }
                 else if (amount>randomBid.amount+30000){
-                    System.out.println("Stop bidding");
+                    //System.out.println("Stop bidding");
                     break;
                 }
                 else {
@@ -191,21 +192,22 @@ public class Player implements railway.sim.Player {
                 link.distance = getDistance(link.town1_id, link.town2_id);
                 link.traffic = transit[link.town1_id][link.town2_id];
                 link.originalValue = bid.amount;
-                System.out.println(link.id + " " + link.town1 + " " + link.town2 + " " + link.originalValue + " " + link.bidValue + " " + 
-                    link.distance + " " + link.traffic);
-                System.out.println("Expected Value: " + (link.distance*link.traffic*10));
+                //System.out.println(link.id + " " + link.town1 + " " + link.town2 + " " + link.originalValue + " " + link.bidValue + " " + 
+                //    link.distance + " " + link.traffic);
+                //System.out.println("Expected Value: " + (link.distance*link.traffic*10));
                 //link.expectedValue = null;
                 availableLinks.add(link);
             }
         }
 
-        for(int i=0; i<availableLinks.size(); i++)
-            System.out.println(availableLinks.get(i).town1 + " " + availableLinks.get(i).town2);
+        //for(int i=0; i<availableLinks.size(); i++)
+        //    System.out.println(availableLinks.get(i).town1 + " " + availableLinks.get(i).town2);
 
     }
 
     private WeightedGraph initializeWeightedGraph(int s,List<String> town, List<List<Integer>> infra)
     {
+    	//System.out.println("PRINTING INFRA INFRA INFRA");
         List<List<Integer>> graph_infra = infra;
         List<String> graph_townLookup = town;
         double distance = 0;
@@ -213,13 +215,60 @@ public class Player implements railway.sim.Player {
         for(int i=0;i<town.size();i++){
             t.setLabel(town.get(i));
         }
+
+		//for(int i=0;i<infra.size();i++){
+        //    for(int j=0;j<infra.get(i).size();j++){
+        //    	System.out.print(infra.get(i).get(j) + " ");
+        //    }
+        //    System.out.println("");
+        // }
+
         for(int i=0;i<infra.size();i++){
             for(int j=0;j<infra.get(i).size();j++){
-                distance = getDistance(i, j)+200;
-                t.addEdge(i, j, distance);
+                distance = getDistance(i, infra.get(i).get(j))+200;
+                t.addEdge(i, infra.get(i).get(j), distance);
             }
         }
         return t;
+    }
+
+    private int getMostValuableNodeNaive(){
+
+		int rows = transit.length;
+		int cols = transit[0].length;
+
+    	int mvn = availableLinks.get(0).town1_id;
+    	int maxRowSum = -1;
+    	for(int i=0; i<availableLinks.size(); i++){
+    		int town1_id = availableLinks.get(i).town1_id;
+    		int town2_id = availableLinks.get(i).town2_id;
+
+			int rowSum1 = 0;
+			int rowSum2 = 0;
+			for(int k=0; k<cols; k++){
+				rowSum1 += transit[town1_id][k] + transit[k][town1_id];
+				rowSum2 += transit[town2_id][k] + transit[k][town2_id];
+			}
+
+			int tempRowSum;
+			int tempTownId;
+			if(rowSum1 > rowSum2){
+				tempRowSum = rowSum1;
+				tempTownId = town1_id;
+			}
+			else{
+				tempRowSum = rowSum2;
+				tempTownId = town2_id;
+			}
+
+			if(tempRowSum > maxRowSum)
+			{
+				maxRowSum = tempRowSum;
+				mvn = tempTownId;
+			}
+    	}
+
+    	return mvn;
     }
 
     private double getDistance(int t1, int t2) {
