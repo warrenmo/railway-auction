@@ -41,6 +41,7 @@ public class Player implements railway.sim.Player {
     private List<AvailableLinks> availableLinks;
 
     private List<BidInfo> availableBids = new ArrayList<>();
+    private WeightedGraph weightedGraph;
     // private static List<LinkInfo> links = new ArrayList<>();
 
     public Player() {
@@ -76,8 +77,29 @@ public class Player implements railway.sim.Player {
         // }
 
         initializeAvailableLinks(currentBids, allBids);
+        //s is the most valuable node
+        int s = 0;
+        // s=getMostValuableNodeNaive();
+
+        //get the weightedGraph given node s
+        weightedGraph=initializeWeightedGraph(s,townLookup,infra);
+        // weightedGraph.print();
+        //implement dijkstra to the weightedGraph
+        int[][] prediction = Dijkstra.dijkstra(weightedGraph, s);
+        for (int n=s;n<townLookup.size();n++){
+            System.out.println(weightedGraph.getLabel(s) + " to " + weightedGraph.getLabel(n));
+            Dijkstra.printPath(weightedGraph, prediction, n);
+            System.out.println();
+        }
 
         System.out.println(name + " has budget: " + budget);
+        
+        for(int i=0;i<infra.size();i++){
+            for(int j=0;j<infra.get(i).size();j++){
+                System.out.println(" infra shows as :"+i+" to "+infra.get(i).get(j));
+            }
+        }
+        
 
         for (BidInfo bi : allBids) {
             System.out.println("Bid id: " + bi.id + " Bid from " + bi.town1 + " to " + bi.town2 + " made by " + bi.owner + " for: " + bi.amount);
@@ -180,6 +202,24 @@ public class Player implements railway.sim.Player {
         for(int i=0; i<availableLinks.size(); i++)
             System.out.println(availableLinks.get(i).town1 + " " + availableLinks.get(i).town2);
 
+    }
+
+    private WeightedGraph initializeWeightedGraph(int s,List<String> town, List<List<Integer>> infra)
+    {
+        List<List<Integer>> graph_infra = infra;
+        List<String> graph_townLookup = town;
+        double distance = 0;
+        WeightedGraph t = new WeightedGraph(town.size());
+        for(int i=0;i<town.size();i++){
+            t.setLabel(town.get(i));
+        }
+        for(int i=0;i<infra.size();i++){
+            for(int j=0;j<infra.get(i).size();j++){
+                distance = getDistance(i, j)+200;
+                t.addEdge(i, j, distance);
+            }
+        }
+        return t;
     }
 
     private double getDistance(int t1, int t2) {
