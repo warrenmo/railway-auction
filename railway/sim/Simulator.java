@@ -68,8 +68,10 @@ public class Simulator {
     private static Random rand = new Random();
 
     private static int uniq = 1;
+    private static String gov = "gov";
 
-    public static void main(String[] args) throws ClassNotFoundException, InstantiationException, IllegalAccessException, IOException {
+    public static void main(String[] args) throws
+        ClassNotFoundException, InstantiationException, IllegalAccessException, IOException {
         parseArgs(args);
         loadInputFiles();
 
@@ -135,6 +137,7 @@ public class Simulator {
         boolean isComplete = false;
         int round = 1;
         Bid maxBid = null;
+
         try {
             while (!allLinksTaken(allBids)) {
                 System.out.println("\nRound " + round++);
@@ -145,19 +148,26 @@ public class Simulator {
                 List<Bid> currentBids = new ArrayList<>();
 
                 int i=0;
+                int null_players = 0;
 
-                while (updates.size() > 0) {
+                while (updates.size() > 0 && null_players <= updates.size()) {
                     PlayerWrapper pw = updates.get(i);
                     try {
                         Bid bid = pw.getBid(
                             deepClone(currentBids), deepClone(allBids), deepClone(maxBid));
                         if (bid == null) {
+                            ++null_players;
                             updates.remove(pw);
                         }
                         else {
                             currentBids.add(0, bid);
-                            i++;
+
+                            // Reset null players because there are players still participating
+                            //  in the auction.
+                            null_players = 0;
                         }
+
+                        ++i;
                     }
                     catch (Exception ex) {
                         // This should be an exception only from getBid function.
@@ -178,11 +188,16 @@ public class Simulator {
                     // If we have holes in the graph then Dijkstra's algorithm will
                     //  fail to run in the future.
                     System.out.println("Nobody bid for anything :( ");
-                    if (gui) {
-                        gui(server, state(-1, allBids, origPlayers));
-                    }
 
-                    System.exit(0);
+                    // Initialize a gov player.
+                    PlayerWrapper govpw = loadPlayerWrapper(gov, timeout);
+                    origPlayers.add(govpw);
+                    govpw.init(budget, deepClone(geo), deepClone(infra),
+                        deepClone(transit), deepClone(townLookup), deepClone(allBids));
+
+                    replaceUnusedBidsByGov();
+
+                    break;
                 }
 
                 maxBid = getMaxBid(currentBids, allBids);
@@ -213,6 +228,8 @@ public class Simulator {
 
         printStats(playerProfits);
 
+        revertGovAssignment(playerProfits);
+
         if (gui) {
             gui(server, state(-1, allBids, origPlayers, playerProfits));
         }
@@ -236,6 +253,94 @@ public class Simulator {
             }
 
             System.out.println();
+        }
+    }
+
+    // Get maximum bid.
+    public static Bid getMaxBid(List<Bid> currentBids, List<BidInfo> allBids) {
+        List<Bid> maxBids = new ArrayList<>();
+        maxBids.add(currentBids.get(0));
+        for (int i=1; i<currentBids.size(); ++i) {
+            Bid b = currentBids.get(i);
+            if (b.amount/getDistance(b) > maxBids.get(0).amount/getDistance(maxBids.get(0))) {
+                maxBids.clear();
+                maxBids.add(b);
+            }
+            else if (b.amount/getDistance(b) ==
+                maxBids.get(0).amount/getDistance(maxBids.get(0))) {
+                maxBids.add(b);
+            }
+        }
+
+        return maxBids.get(rand.nextInt(maxBids.size()));
+    }
+
+    // Get the cost per km of the maximum bid.
+    public static double getMaxBidCostPerKm(List<Bid> currentBids, List<BidInfo> allBids) {
+        Bid maxBid = getMaxBid(currentBids, allBids);
+        return maxBid.amount / getDistance(maxBid);
+    }
+
+    private static void updateBids(Bid bid, List<BidInfo> allBids) {
+        BidInfo bi = allBids.get(bid.id1);
+        double amount = bid.amount;
+
+        if (bid.id2 != -1) {
+            BidInfo bi2 = allBids.get(bid.id2);
+            bi2.amount = amount/2;
+            bi2.owner = bid.bidder;
+            amount /= 2;
+        }
+
+        bi.amount = amount;
+        bi.owner = bid.bidder;
+    }
+
+    // The following 4 functions that getDistance depending on the parameter 
+    // that you give.
+    public static double getDistance(Bid bid) {
+        double dist = getDistance(bid.id1);
+
+        if (bid.id2 != -1) {
+            dist += getDistance(bid.id2);
+        }
+
+        return dist;
+    }
+
+    public static double getDistance(String t1, String t2) {
+        return getDistance(townRevLookup.get(t1), townRevLookup.get(t2));
+    }
+
+    public static double getDistance(int linkId) {
+        return links.get(linkId).distance;
+    }
+
+    public static double getDistance(int t1, int t2) {
+        return Math.pow(
+            Math.pow(geo.get(t1).x - geo.get(t2).x, 2) +
+                Math.pow(geo.get(t1).y - geo.get(t2).y, 2),
+            0.5);
+    }
+
+    private static void replaceUnusedBidsByGov() {
+        for (BidInfo bi : allBids) {
+           if (bi.owner == null) {
+               bi.owner = gov;
+               bi.amount = 0;
+           }
+        }
+    }
+
+    private static void revertGovAssignment(Map<String, Double> playerProfits) {
+        for (BidInfo bi : allBids) {
+           if (bi.owner.equals(gov)) {
+               bi.owner = null;
+           }
+        }
+
+        if (playerProfits.containsKey(gov)) {
+            playerProfits.remove(gov);
         }
     }
 
@@ -279,7 +384,7 @@ public class Simulator {
 
     private static Map<String, Double> getProfitsPerPlayer(double[][] revenue) {
         // The graph now has nodes replicated for each player and a start and end node.
-        final int n = geo.size() * (playerNames.size() + 2);
+        final int n = geo.size() * (origPlayers.size() + 2);
 
         Map<String, Double> playerRev = new HashMap<>();
         for (int i=0; i<origPlayers.size(); ++i) {
@@ -400,64 +505,6 @@ public class Simulator {
         return true;
     }
 
-    private static Bid getMaxBid(List<Bid> currentBids, List<BidInfo> allBids) {
-        List<Bid> maxBids = new ArrayList<>();
-        maxBids.add(currentBids.get(0));
-        for (int i=1; i<currentBids.size(); ++i) {
-            Bid b = currentBids.get(i);
-            if (b.amount/getDistance(b) > maxBids.get(0).amount/getDistance(maxBids.get(0))) {
-                maxBids.clear();
-                maxBids.add(b);
-            }
-            else if (b.amount/getDistance(b) ==
-                maxBids.get(0).amount/getDistance(maxBids.get(0))) {
-                maxBids.add(b);
-            }
-        }
-
-        return maxBids.get(rand.nextInt(maxBids.size()));
-    }
-
-    private static void updateBids(Bid bid, List<BidInfo> allBids) {
-        BidInfo bi = allBids.get(bid.id1);
-        double amount = bid.amount;
-
-        if (bid.id2 != -1) {
-            BidInfo bi2 = allBids.get(bid.id2);
-            bi2.amount = amount/2;
-            bi2.owner = bid.bidder;
-            amount /= 2;
-        }
-
-        bi.amount = amount;
-        bi.owner = bid.bidder;
-    }
-
-    private static double getDistance(Bid bid) {
-        double dist = getDistance(bid.id1);
-
-        if (bid.id2 != -1) {
-            dist += getDistance(bid.id2);
-        }
-
-        return dist;
-    }
-
-    private static double getDistance(String t1, String t2) {
-        return getDistance(townRevLookup.get(t1), townRevLookup.get(t2));
-    }
-
-    private static double getDistance(int linkId) {
-        return links.get(linkId).distance;
-    }
-
-    private static double getDistance(int t1, int t2) {
-        return Math.pow(
-            Math.pow(geo.get(t1).x - geo.get(t2).x, 2) +
-                Math.pow(geo.get(t1).y - geo.get(t2).y, 2),
-            0.5);
-    }
-
     private static void initBids() {
         int id = 0;
 
@@ -555,7 +602,6 @@ public class Simulator {
                 } else {
                     infra.get(townRevLookup.get(res[0])).add(townRevLookup.get(res[1]));
                 }
-                // infra.get(townRevLookup.get(res[1])).add(res[0]);
             }
 
             transit = new int[index][index];
@@ -575,8 +621,6 @@ public class Simulator {
                     transit[townRevLookup.get(res[0])][townRevLookup.get(res[1])] =
                         Integer.parseInt(res[2]);
                 }
-                // transit[townRevLookup.get(res[1])][townRevLookup.get(res[0])] =
-                //    Integer.parseInt(res[2]);
             }
         }
         catch (Exception ex) {
@@ -724,7 +768,7 @@ public class Simulator {
         json = json.substring(0, json.length() - 1);
         json += "\"}";
 
-        System.out.println(json);
+        //System.out.println(json);
 
         return json;
     }
@@ -852,7 +896,8 @@ public class Simulator {
         return files;
     }
 
-    public static Player loadPlayer(String name) throws IOException, ClassNotFoundException, InstantiationException, IllegalAccessException {
+    public static Player loadPlayer(String name)
+        throws IOException, ClassNotFoundException, InstantiationException, IllegalAccessException {
         String sep = File.separator;
         Set<File> player_files = directory(root + sep + name, ".java");
         File class_file = new File(root + sep + name + sep + "Player.class");
