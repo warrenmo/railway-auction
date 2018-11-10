@@ -19,4 +19,11 @@ public class Bid implements Serializable {
         id1 = -1;
         id2 = -1;
     }
+
+    public Bid(Bid b) {
+        this.id1 = b.id1;
+        this.id2 = b.id2;
+        this.amount = b.amount;
+        this.bidder = b.bidder;
+    }
 }
