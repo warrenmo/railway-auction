@@ -106,7 +106,7 @@ public class PlayerWrapper {
         }
 
         bid.bidder = this.name;
-        return bid;
+        return new Bid(bid);
     }
 
     public void updateBudget(Bid bid) {
