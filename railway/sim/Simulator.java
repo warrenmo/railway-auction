@@ -48,7 +48,7 @@ public class Simulator {
     private static String geo_f = "geography";
     private static String transit_f = "transit";
     private static String infra_f = "infrastructure";
-    private static String dir = "railway/g4/input/";
+    private static String dir = "railway/sim/input/";
 
     private static List<Coordinates> geo = new ArrayList<>();
     private static List<List<Integer>> infra = new ArrayList<>();
