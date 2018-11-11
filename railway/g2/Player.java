@@ -171,6 +171,11 @@ public class Player implements railway.sim.Player {
 
         //System.out.println("BUDGET:");
         //System.out.println(budget);
+        //for (AvailableLinks link : availableLinks) {
+        //    System.out.println(link.town1 + "-" + link.town2);
+        //}
+        //System.out.println(availableLinks);
+        //System.out.println(allBids);
         for (Integer i = availableLinks.size()-1; i >= 0; i--)
         {
             AvailableLinks candidate = availableLinks.get(i);
@@ -298,7 +303,7 @@ public class Player implements railway.sim.Player {
         //    System.out.println("");
         // }
 
-        Double hyperparam = 0.7;
+        Double hyperparam = 0.75;
 
         for(int i=0;i<infra.size();i++){
             for(int j=0;j<infra.get(i).size();j++){
